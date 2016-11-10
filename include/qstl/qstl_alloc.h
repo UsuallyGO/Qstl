@@ -2,7 +2,8 @@
 #ifndef _QSTL_STL_ALLOC_
 #define _QSTL_STL_ALLOC_
 
-#include <stdder.h> //for size_t
+#include <stddef.h> //for size_t
+#include <stdlib.h>
 
 //perhaps these macros should not be defined here
 #define _QSTL_USE_STANDARD_MALLOC
@@ -10,6 +11,7 @@
 #define _QSTL_USE_OOM_HANDLER
 
 #ifdef _QSTL_USE_STANDARD_MALLOC //use system malloc
+#define THROW_BAD_ALLOC 
 
 //oom:out-of-memory
 template<int inst>
@@ -104,18 +106,18 @@ class simple_alloc{
 	}
 };
 
-template<typename Tp, class _Alloc_template>
+template<class _Alloc_template>
 class simple_alloc<void, _Alloc_template>{
-	static Tp* allocate(size_t n){
+	static void* allocate(size_t n){
 		return 0;
 	}
-	static Tp* allocate(){
+	static void* allocate(){
 		return 0;
 	}
-	static Tp* reallocate(Tp* ptr, size_t n){
+	static void* reallocate(void* ptr, size_t n){
 		return 0;
 	}
-	static void deallocate(Tp* ptr){
+	static void deallocate(void* ptr){
 		(ptr);
 	}	
 };
@@ -151,7 +153,7 @@ public:
 	}
 };
 
-template<typename Tp>
+template<>
 class allocator<void>{
 	//actually, there is nothing here...
 };
@@ -184,10 +186,10 @@ public:
 	}
 };
 
+/*
 template<typename Tp, class _allocator>
 struct _Alloc_traits{
 	static const bool instanceless = false;
-	typedef 
 };
 
 template<typename Tp, typename Tp2>
@@ -224,5 +226,5 @@ struct _Alloc_traits<Tp, _allocator<Tp2, _userdefine_malloc_template<threads, in
 	typedef simple_alloc<Tp, _userdefine_malloc_template<threads, inst> > alloc_type;
 	typedef _allocator<Tp, _userdefine_malloc_template<threads, inst> > allocator_type;
 };
-
+*/
 #endif //!_QSTL_STL_ALLOC_

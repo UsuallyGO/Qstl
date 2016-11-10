@@ -18,7 +18,7 @@ cd $cur_dir
 
 target=qtest
 source=$src_dir/test
-opt_debug=-DCMAKE_BUILD_TYPE=RELEASE
+opt_debug=-DCMAKE_BUILD_TYPE=DEBUG
 opt_prefix=/usr/local
 
 while test $# -gt 0; do
