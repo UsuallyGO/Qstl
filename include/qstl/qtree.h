@@ -149,27 +149,13 @@ struct _rb_tree_const_iterator : public _rb_tree_iterator_base{
 
 };
 
-template<class Value>
-inline bool operator==(const _rb_tree_iterator<Value>& x,
-						const _rb_tree_iterator<Value>& y){
+inline bool operator==(const _rb_tree_iterator_base& x, 
+						const _rb_tree_iterator_base& y){
 	return x.node == y.node;
 }
 
-template<class Value>
-inline bool operator==(_rb_tree_const_iterator<Value>& x,
-					_rb_tree_const_iterator<Value>& y){
-	return x.node == y.node;
-}
-
-template<class Value>
-inline bool operator!=(const _rb_tree_iterator<Value>& x,
-					const _rb_tree_iterator<Value>& y){
-	return x.node != y.node;
-}
-
-template<class Value>
-inline bool operator!=(_rb_tree_const_iterator<Value>& x,
-						_rb_tree_const_iterator<Value>& y){
+inline bool operator!=(const _rb_tree_iterator_base& x,
+						const _rb_tree_iterator_base& y){
 	return x.node != y.node;
 }
 
@@ -180,7 +166,7 @@ Iterator_Category(const _rb_tree_iterator_base& i){
 
 class _int_cmp{
 public:
-	int operator()(int x, int y){
+	int operator()(int x, int y) const {
 		return x - y;
 	}
 };
@@ -231,6 +217,8 @@ private:
 		while(node->right) node = node->right;
 		return (link_type)node;
 	}
+	bool _rb_verify() const;
+	int _black_nodes_to_root(base_ptr n) const;
 
 public:
 	_rb_tree(){
@@ -239,7 +227,7 @@ public:
 		header->right = 0;
 		root() = 0;//header->parent = 0
 
-		node_count = 0;
+		node_num = 0;
 		key_cmp = Compare();
 	}
 	iterator find(const Key& k);//can't return reference directly, because may be 0
@@ -250,10 +238,12 @@ public:
 	const_iterator begin() const { return _left_most(); }
 	iterator end(){ return (link_type)(header); }
 	const_iterator end() const { return (link_type)(header); }
+	int node_count() const { return node_num; }
+	bool rb_verify()const { return _rb_verify(); }
 
 private:
 	link_type header;
-	size_type node_count;
+	size_type node_num;
 	Compare key_cmp;
 };
 
@@ -301,7 +291,9 @@ void _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::_rb_erase_fixup(const
 		if(cmp == 0) break;
 		z = cmp > 0 ? (link_type)z->right : (link_type)z->left;
 	}
+	if(!z) return;
 
+	node_num--;
 	base_ptr y = z;
 	base_ptr x = 0, x_p = 0;
 	if(z->left == 0)
@@ -436,7 +428,7 @@ void _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::insert(const Key& k){
 		root() = node;
 		node->parent = header;
 		node->color = _rb_tree_black_color;
-		node_count++;
+		node_num++;
 		return;
 	}
 
@@ -452,7 +444,7 @@ void _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::insert(const Key& k){
 	if(cmp < 0) n->left = node;
 	else n->right = node;
 	node->parent = n;
-	node_count++;
+	node_num++;
 
     base_ptr  base = (base_ptr)node;
 	_rb_insert_rebalance(base);
@@ -524,6 +516,68 @@ _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::_right_rotation(base_ptr n
 	if(s->right) s->right->parent = node;
 	s->right = node;
 	node->parent = s;
+}
+
+template<class Key, class Value, /*class KeyOfValue,*/ class Compare, class Alloc>
+int _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::
+_black_nodes_to_root(base_ptr n) const{
+	int num = 0;
+
+	while(n && n != header){
+		if(n->color == _rb_tree_black_color) num++;
+		n = n->parent;
+	}
+	return num;
+}
+
+/* This was once a century problem to me: how to know the tree is legal or illegal 
+ * reb-black tree? To be naive, I choose to print out the pre-visit, in-visit to 
+ * check out the tree. But as you know, it is time waisted and very difficult to 
+ * know whether the print out is right or not. You have to build the legal tree 
+ * manually first! This time, the strategy has been changed. I learn the way how to
+ * check out the red-black tree from STL.
+ *
+ * We need to check out these points to make sure the tree is legal or not:
+ *  1) Root should be black
+ *  2) Red node should be no red children
+ *  3) The number of black nodes from root to each leaf(null node) are all the same
+ *  4) The value of parent is greater than left child and less than right child.
+ *  5) The minimum node should be leftmost, the maximum node should be rightmost.
+ *
+ * We can apply to check the first 4 points right now. Because there is no minimum
+ * and maximum in current version of rb tree(2016-11-10).
+ *
+ * Return value: true means legal tree, false means illegal.
+ */
+template<class Key, class Value, /*class KeyOfValue,*/ class Compare, class Alloc>
+bool _rb_tree<Key, Value, /*KeyOfValue,*/ Compare, Alloc>::_rb_verify() const {
+	if(header->parent == 0 || node_num == 0)
+		return !header->parent && !node_num;
+	if(header->parent->color != _rb_tree_black_color)
+		return false;
+
+	link_type n = _left_most();
+	int num = _black_nodes_to_root(n);
+	for(const_iterator iter = begin(); iter != end(); iter++){
+		link_type x = (link_type)iter.node;
+		link_type l = (link_type)x->left;
+		link_type r = (link_type)x->right;
+		if(x->color == _rb_tree_red_color){
+			if((l && l->color == _rb_tree_red_color)
+				||(r && r->color == _rb_tree_red_color))
+			return false;
+		}
+
+		if(l && key_cmp(x->value_field, l->value_field) <= 0) return 0;
+		if(r && key_cmp(x->value_field, r->value_field) >= 0) return 0;
+
+		if(!l && !r){
+			int tmp = _black_nodes_to_root(x);
+			if(tmp != num) return false;
+		}
+	}
+
+	return true;
 }
 
 #endif //!_QSTL_TREE_H_
